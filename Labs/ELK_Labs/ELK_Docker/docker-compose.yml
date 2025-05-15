@@ -1,55 +1,78 @@
 version: '3.6'
-services:
-  Elasticsearch:
-    image: elasticsearch:7.16.2
-    container_name: elasticsearch
-    restart: always
-    volumes:
-      - elastic_data:/usr/share/elasticsearch/data/
-      - ./logstash/:/logstash_dir
-    environment:
-      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
-      discovery.type: single-node    
-    ports:
-      - '9200:9200'
-      - '9300:9300'
-    networks:
-      - elk
 
-  Logstash:
-    image: logstash:7.16.2
-    container_name: logstash
-    restart: always
+services:
+  # Elasticsearch service configuration
+  Elasticsearch:
+    image: elasticsearch:7.16.2  # Elasticsearch image version
+    container_name: elasticsearch
+    restart: always  # Ensures the container restarts automatically on failure
     volumes:
-      - ./logstash/:/logstash_dir
-    command: logstash -f /logstash_dir/logstash.conf 
+      - elastic_data:/usr/share/elasticsearch/data/  # Persistent data volume
+      - ./logstash/:/logstash_dir  # Volume for Logstash configurations
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"  # Java options for Elasticsearch
+      discovery.type: single-node  # Configuration for a single-node cluster
+    ports:
+      - '9200:9200'  # Port for Elasticsearch HTTP interface
+      - '9300:9300'  # Port for Elasticsearch TCP transport
+    networks:
+      - elk  # Connects to the 'elk' network
+
+  # Logstash service configuration
+  Logstash:
+    image: logstash:7.16.2  # Logstash image version
+    container_name: logstash
+    restart: always  # Ensures the container restarts automatically on failure
+    volumes:
+      - ./logstash/:/logstash_dir  # Mounts the Logstash configuration directory
+    command: logstash -f /logstash_dir/logstash.conf  # Command to start Logstash
+    depends_on:
+      - Elasticsearch  # Depends on Elasticsearch service to be started first
+    ports:
+      - '9600:9600'  # Port for Logstash HTTP interface
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"  # Java options for Logstash
+    networks:
+      - elk  # Connects to the 'elk' network
+
+  # Kibana service configuration
+  Kibana:
+    image: kibana:7.16.2  # Kibana image version
+    container_name: kibana
+    restart: always  # Ensures the container restarts automatically on failure
+    ports:
+      - '5601:5601'  # Port for Kibana web interface
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200  # URL for connecting to Elasticsearch
+      - xpack.security.enabled=false  # Disables security features
+      - xpack.encryptedSavedObjects.encryptionKey=TnX1pCE7fwYV3jSBDcg7nd/L821GTk/w/aVde8Q4lnY=  # Key for encrypted saved objects
+    depends_on:
+      - Elasticsearch  # Depends on Elasticsearch service to be started first
+    networks:
+      - elk  # Connects to the 'elk' network
+  
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.16.2
+    container_name: metricbeat
+    restart: always
+    user: root
     depends_on:
       - Elasticsearch
-    ports:
-      - '9600:9600'
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"    
+      ELASTIC_HOSTS: "elasticsearch:9200"
+      LOGSTASH_HOSTS: "logstash:9600"
+      KIBANA_HOSTS: "kibana:5601"
+      BEAT_STRICT_PERMS: "false"          # <--- Add this line
+    command: ["metricbeat", "-e"]
     networks:
       - elk
 
-  Kibana:
-    image: kibana:7.16.2
-    container_name: kibana
-    restart: always       
-    ports:
-      - '5601:5601'
-    environment:
-    - ELASTICSEARCH_URL=http://elasticsearch:9200
-    - xpack.security.enabled=false  # Only if you're not using security features
-    - xpack.encryptedSavedObjects.encryptionKey=TnX1pCE7fwYV3jSBDcg7nd/L821GTk/w/aVde8Q4lnY=
-    
-    depends_on:
-      - Elasticsearch  
-    networks:
-      - elk
 
 volumes:
-  elastic_data: {}
+  elastic_data:  # Defines a volume for Elasticsearch data
 
 networks:
-  elk:
+  elk:  # Defines the 'elk' network used by all services

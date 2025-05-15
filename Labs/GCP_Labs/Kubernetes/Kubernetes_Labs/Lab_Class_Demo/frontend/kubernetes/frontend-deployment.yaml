@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: mlops
+  name: frontend-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend-app
+  template:
+    metadata:
+      labels:
+        app: frontend-app
+    spec:
+      containers:
+          - name: frontend-app-container
+            image: raminmohammadi87/networking-frontend-app:v7
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 80
+            resources:
+              requests:
+                memory: "40Mi"
+                cpu: "5m"
+              limits:
+                memory: "100Mi"
+                cpu: "20m"

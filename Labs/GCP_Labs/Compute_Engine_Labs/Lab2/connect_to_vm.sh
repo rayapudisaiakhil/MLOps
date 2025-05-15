@@ -1,0 +1,1 @@
+ssh -i gcp_labs #address to the vm machine
